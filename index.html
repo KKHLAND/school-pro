@@ -359,6 +359,7 @@
       searchTerm: '',
       selectedItem: null,
       selectedStatsFilter: null, // 'discussion', 'survey', 'answered', 'pending'
+      selectedProposer: null, // 제안자 필터
       schoolInfo: { year: '2025', schoolName: '' },
       agendaData: [],
       isDataLoaded: false
@@ -542,7 +543,10 @@
         const matchDept = state.selectedDept === '전체' || 
           item.담당부서.includes(state.selectedDept);
         
-        return matchSearch && matchDept;
+        const matchProposer = !state.selectedProposer ||
+          item.제안자.replace(/\n.*/, '').trim() === state.selectedProposer;
+        
+        return matchSearch && matchDept && matchProposer;
       });
     }
 
@@ -918,12 +922,25 @@
                 `).join('')}
               </select>
               
-              ${state.searchTerm || state.selectedDept !== '전체' ? `
+              ${state.searchTerm || state.selectedDept !== '전체' || state.selectedProposer ? `
                 <button onclick="clearFilters()" class="px-4 py-3 rounded-xl border border-white/20 hover:bg-white/5 transition-all text-slate-400 hover:text-white">
                   필터 초기화
                 </button>
               ` : ''}
             </div>
+            
+            <!-- 제안자 필터 태그 -->
+            ${state.selectedProposer ? `
+              <div class="mt-4 flex items-center gap-3">
+                <span class="text-sm text-slate-400">제안자 필터:</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30">
+                  <span class="text-amber-300 font-medium">${state.selectedProposer}</span>
+                  <button onclick="clearProposerOnly()" class="text-amber-400 hover:text-amber-300 transition-colors">
+                    ${icons.close}
+                  </button>
+                </div>
+              </div>
+            ` : ''}
             
             <div class="mt-4 flex items-center gap-2 text-sm text-slate-400">
               <span>총 ${filteredData.length}건</span>
@@ -1013,11 +1030,16 @@
     }
 
     // 통계 페이지
+    let currentProposerList = []; // 현재 제안자 목록 저장
+    
     function renderStats(stats) {
       const deptEntries = Object.entries(stats.deptStats).sort((a, b) => b[1] - a[1]);
       const proposerEntries = Object.entries(stats.proposerStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
       const maxDeptCount = Math.max(...deptEntries.map(([_, count]) => count), 1);
       const maxProposerCount = Math.max(...proposerEntries.map(([_, count]) => count), 1);
+      
+      // 전역 변수에 제안자 목록 저장
+      currentProposerList = proposerEntries.map(([name]) => name);
       
       const totalItems = state.agendaData.length;
       const pendingCount = totalItems - stats.answeredCount;
@@ -1159,15 +1181,19 @@
               <div class="space-y-4">
                 ${proposerEntries.map(([name, count], index) => {
                   const percentage = Math.round((count / maxProposerCount) * 100);
+                  const isSelected = state.selectedProposer === name;
                   return `
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 cursor-pointer p-2 -mx-2 rounded-lg transition-all hover:bg-white/5 ${isSelected ? 'bg-amber-500/10 ring-1 ring-amber-500/50' : ''}" onclick="selectProposerByIndex(${index})">
                       <div class="w-8 h-8 rounded-lg ${index < 3 ? 'gold-gradient' : 'bg-white/10'} flex items-center justify-center text-sm font-bold ${index < 3 ? 'text-black' : 'text-white'}">
                         ${index + 1}
                       </div>
                       <div class="flex-1">
                         <div class="flex justify-between items-center mb-1">
-                          <span class="text-sm text-slate-300">${name}</span>
-                          <span class="text-sm font-semibold text-amber-400">${count}건</span>
+                          <span class="text-sm text-slate-300 ${isSelected ? 'text-amber-300 font-medium' : ''}">${name}</span>
+                          <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-amber-400">${count}건</span>
+                            <span class="text-xs text-slate-500">클릭</span>
+                          </div>
                         </div>
                         <div class="progress-track h-2">
                           <div class="progress-fill h-full" style="width: ${percentage}%"></div>
@@ -1548,7 +1574,11 @@
     // 이벤트 핸들러
     function setTab(tab) {
       state.activeTab = tab;
-      state.selectedStatsFilter = null; // 탭 변경 시 필터 초기화
+      state.selectedStatsFilter = null; // 탭 변경 시 통계 필터 초기화
+      // 안건 목록 탭이 아닌 다른 탭으로 이동할 때만 제안자 필터 초기화
+      if (tab !== 'list') {
+        state.selectedProposer = null;
+      }
       render();
     }
 
@@ -1561,6 +1591,7 @@
     function clearFilters() {
       state.searchTerm = '';
       state.selectedDept = '전체';
+      state.selectedProposer = null;
       render();
     }
 
@@ -1571,6 +1602,30 @@
 
     function clearStatsFilter() {
       state.selectedStatsFilter = null;
+      render();
+    }
+
+    function toggleProposerFilter(name) {
+      state.selectedProposer = state.selectedProposer === name ? null : name;
+      render();
+    }
+
+    function selectProposerByIndex(index) {
+      const name = currentProposerList[index];
+      if (name) {
+        state.selectedProposer = name;
+        state.activeTab = 'list';
+        render();
+      }
+    }
+
+    function clearProposerFilter() {
+      state.selectedProposer = null;
+      render();
+    }
+
+    function clearProposerOnly() {
+      state.selectedProposer = null;
       render();
     }
 
@@ -1703,6 +1758,10 @@
     window.clearFilters = clearFilters;
     window.toggleStatsFilter = toggleStatsFilter;
     window.clearStatsFilter = clearStatsFilter;
+    window.toggleProposerFilter = toggleProposerFilter;
+    window.selectProposerByIndex = selectProposerByIndex;
+    window.clearProposerFilter = clearProposerFilter;
+    window.clearProposerOnly = clearProposerOnly;
     window.showDetail = showDetail;
     window.closeModal = closeModal;
     window.saveSchoolInfo = saveSchoolInfo;
