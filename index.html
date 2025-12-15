@@ -358,6 +358,7 @@
       selectedDept: '전체',
       searchTerm: '',
       selectedItem: null,
+      selectedStatsFilter: null, // 'discussion', 'survey', 'answered', 'pending'
       schoolInfo: { year: '2025', schoolName: '' },
       agendaData: [],
       isDataLoaded: false
@@ -920,6 +921,34 @@
       const proposerEntries = Object.entries(stats.proposerStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
       const maxDeptCount = Math.max(...deptEntries.map(([_, count]) => count), 1);
       const maxProposerCount = Math.max(...proposerEntries.map(([_, count]) => count), 1);
+      
+      const totalItems = state.agendaData.length;
+      const pendingCount = totalItems - stats.answeredCount;
+
+      // 필터된 안건 가져오기
+      const getFilteredItems = () => {
+        switch(state.selectedStatsFilter) {
+          case 'discussion':
+            return state.agendaData.filter(item => item.희망_전체토론);
+          case 'survey':
+            return state.agendaData.filter(item => item.희망_전체설문);
+          case 'answered':
+            return state.agendaData.filter(item => item.담당부서답변);
+          case 'pending':
+            return state.agendaData.filter(item => !item.담당부서답변);
+          default:
+            return [];
+        }
+      };
+
+      const filteredItems = getFilteredItems();
+      
+      const filterLabels = {
+        'discussion': '전체 토론 희망 안건',
+        'survey': '전체 설문 희망 안건',
+        'answered': '답변 완료 안건',
+        'pending': '답변 대기 안건'
+      };
 
       return `
         <div class="space-y-8 animate-fade-up">
@@ -929,19 +958,80 @@
               <div class="text-4xl font-bold gold-text font-display mb-2">${state.agendaData.length}</div>
               <div class="text-sm text-slate-400">총 안건</div>
             </div>
-            <div class="glass-card rounded-2xl p-6 text-center">
+            <button onclick="toggleStatsFilter('answered')" class="glass-card rounded-2xl p-6 text-center transition-all hover:scale-105 ${state.selectedStatsFilter === 'answered' ? 'ring-2 ring-emerald-500 bg-emerald-500/10' : ''}">
               <div class="text-4xl font-bold text-emerald-400 font-display mb-2">${stats.answeredCount}</div>
               <div class="text-sm text-slate-400">답변 완료</div>
-            </div>
-            <div class="glass-card rounded-2xl p-6 text-center">
+              <div class="text-xs text-emerald-400/70 mt-1">클릭하여 보기</div>
+            </button>
+            <button onclick="toggleStatsFilter('discussion')" class="glass-card rounded-2xl p-6 text-center transition-all hover:scale-105 ${state.selectedStatsFilter === 'discussion' ? 'ring-2 ring-blue-500 bg-blue-500/10' : ''}">
               <div class="text-4xl font-bold text-blue-400 font-display mb-2">${stats.discussionCount}</div>
               <div class="text-sm text-slate-400">전체 토론 희망</div>
-            </div>
-            <div class="glass-card rounded-2xl p-6 text-center">
+              <div class="text-xs text-blue-400/70 mt-1">클릭하여 보기</div>
+            </button>
+            <button onclick="toggleStatsFilter('survey')" class="glass-card rounded-2xl p-6 text-center transition-all hover:scale-105 ${state.selectedStatsFilter === 'survey' ? 'ring-2 ring-purple-500 bg-purple-500/10' : ''}">
               <div class="text-4xl font-bold text-purple-400 font-display mb-2">${stats.surveyCount}</div>
               <div class="text-sm text-slate-400">전체 설문 희망</div>
-            </div>
+              <div class="text-xs text-purple-400/70 mt-1">클릭하여 보기</div>
+            </button>
           </div>
+
+          <!-- 필터된 안건 목록 -->
+          ${state.selectedStatsFilter ? `
+            <div class="glass-card rounded-2xl p-6 animate-fade-up">
+              <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold flex items-center gap-3">
+                  <span class="w-2 h-8 rounded-full ${
+                    state.selectedStatsFilter === 'discussion' ? 'bg-blue-500' :
+                    state.selectedStatsFilter === 'survey' ? 'bg-purple-500' :
+                    state.selectedStatsFilter === 'answered' ? 'bg-emerald-500' : 'bg-amber-500'
+                  }"></span>
+                  ${filterLabels[state.selectedStatsFilter]}
+                  <span class="text-sm font-normal text-slate-400">(${filteredItems.length}건)</span>
+                </h3>
+                <button onclick="clearStatsFilter()" class="px-4 py-2 rounded-lg glass hover:bg-white/10 transition-all text-sm text-slate-400 hover:text-white flex items-center gap-2">
+                  ${icons.close}
+                  닫기
+                </button>
+              </div>
+              
+              <div class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                ${filteredItems.length > 0 ? filteredItems.map(item => {
+                  const color = getDeptColor(item.담당부서);
+                  return `
+                    <div class="p-4 rounded-xl glass hover:bg-white/5 cursor-pointer transition-all" onclick="showDetail(${item.연번})">
+                      <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 rounded-lg gold-gradient flex items-center justify-center font-bold text-black shrink-0 text-sm">
+                          ${item.연번}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <h4 class="font-medium text-white">${item.사업명}</h4>
+                            <span class="category-tag ${color.light} border text-xs">${item.담당부서.split('\n')[0]}</span>
+                          </div>
+                          <p class="text-sm text-slate-400 line-clamp-2">${item.현황_문제점 || item.개선방안 || ''}</p>
+                          <div class="flex items-center gap-3 mt-2">
+                            <span class="text-xs text-slate-500">제안: ${item.제안자.replace(/\n.*/, '')}</span>
+                            ${item.담당부서답변 ? `
+                              <span class="flex items-center gap-1 text-xs text-emerald-400">
+                                ${icons.check} 답변완료
+                              </span>
+                            ` : ''}
+                          </div>
+                        </div>
+                        <div class="text-slate-500 shrink-0">
+                          ${icons.arrow}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('') : `
+                  <div class="text-center py-8 text-slate-400">
+                    해당 조건의 안건이 없습니다.
+                  </div>
+                `}
+              </div>
+            </div>
+          ` : ''}
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- 부서별 통계 -->
@@ -952,7 +1042,7 @@
                   const color = getDeptColor(dept);
                   const percentage = Math.round((count / maxDeptCount) * 100);
                   return `
-                    <div>
+                    <div class="cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded-lg transition-all" onclick="filterAndShowList('${dept}')">
                       <div class="flex justify-between items-center mb-2">
                         <span class="text-sm text-slate-300">${dept}</span>
                         <span class="text-sm font-semibold text-amber-400">${count}건 (${Math.round((count / state.agendaData.length) * 100)}%)</span>
@@ -1361,6 +1451,7 @@
     // 이벤트 핸들러
     function setTab(tab) {
       state.activeTab = tab;
+      state.selectedStatsFilter = null; // 탭 변경 시 필터 초기화
       render();
     }
 
@@ -1373,6 +1464,16 @@
     function clearFilters() {
       state.searchTerm = '';
       state.selectedDept = '전체';
+      render();
+    }
+
+    function toggleStatsFilter(filter) {
+      state.selectedStatsFilter = state.selectedStatsFilter === filter ? null : filter;
+      render();
+    }
+
+    function clearStatsFilter() {
+      state.selectedStatsFilter = null;
       render();
     }
 
@@ -1503,6 +1604,8 @@
     window.setTab = setTab;
     window.filterAndShowList = filterAndShowList;
     window.clearFilters = clearFilters;
+    window.toggleStatsFilter = toggleStatsFilter;
+    window.clearStatsFilter = clearStatsFilter;
     window.showDetail = showDetail;
     window.closeModal = closeModal;
     window.saveSchoolInfo = saveSchoolInfo;
