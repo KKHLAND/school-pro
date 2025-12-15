@@ -6,6 +6,7 @@
   <title>2025 교육사업평가분석토론회</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -639,7 +640,7 @@
       // 부서별 통계 (상위 6개)
       const deptEntries = Object.entries(stats.deptStats)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 6);
+        .slice(0, 8);
       
       const maxDeptCount = Math.max(...deptEntries.map(([_, count]) => count), 1);
 
@@ -683,29 +684,16 @@
             </div>
           </div>
 
-          <!-- 부서별 현황 -->
+          <!-- 차트 섹션 -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- 파이차트 -->
             <div class="glass-card rounded-2xl p-6 animate-fade-up stagger-1">
               <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
                 ${icons.chart}
-                <span>부서별 안건 현황</span>
+                <span>부서별 안건 분포</span>
               </h3>
-              <div class="space-y-4">
-                ${deptEntries.map(([dept, count]) => {
-                  const color = getDeptColor(dept);
-                  const percentage = Math.round((count / maxDeptCount) * 100);
-                  return `
-                    <div class="group cursor-pointer" onclick="filterAndShowList('${dept}')">
-                      <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-slate-300 group-hover:text-white transition-colors">${dept}</span>
-                        <span class="text-sm font-semibold text-amber-400">${count}건</span>
-                      </div>
-                      <div class="progress-track h-2">
-                        <div class="h-full rounded-full bg-gradient-to-r ${color.bg}" style="width: ${percentage}%"></div>
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
+              <div class="relative">
+                <canvas id="deptPieChart" style="max-height: 320px;"></canvas>
               </div>
             </div>
 
@@ -734,41 +722,70 @@
             </div>
           </div>
 
-          <!-- 빠른 액션 -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up stagger-3">
-            <button onclick="setTab('list')" class="glass-card rounded-xl p-6 text-left hover:border-amber-500/30 transition-all group">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-                  ${icons.folder}
+          <!-- 답변 현황 파이차트 -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="glass-card rounded-2xl p-6 animate-fade-up stagger-3">
+              <h3 class="text-lg font-bold mb-4 text-center">답변 현황</h3>
+              <div class="relative" style="height: 200px;">
+                <canvas id="answerPieChart"></canvas>
+              </div>
+              <div class="flex justify-center gap-6 mt-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <span class="text-xs text-slate-400">완료 ${stats.answeredCount}</span>
                 </div>
-                <div>
-                  <p class="font-semibold text-white">전체 안건</p>
-                  <p class="text-sm text-slate-400">목록 보기</p>
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <span class="text-xs text-slate-400">대기 ${totalItems - stats.answeredCount}</span>
                 </div>
               </div>
-            </button>
-            <button onclick="setTab('stats')" class="glass-card rounded-xl p-6 text-left hover:border-amber-500/30 transition-all group">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                  ${icons.chart}
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 animate-fade-up stagger-4">
+              <h3 class="text-lg font-bold mb-4 text-center">희망 답변 방식</h3>
+              <div class="relative" style="height: 200px;">
+                <canvas id="responsePieChart"></canvas>
+              </div>
+              <div class="flex justify-center gap-4 mt-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span class="text-xs text-slate-400">토론 ${stats.discussionCount}</span>
                 </div>
-                <div>
-                  <p class="font-semibold text-white">상세 통계</p>
-                  <p class="text-sm text-slate-400">분석 보기</p>
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <span class="text-xs text-slate-400">설문 ${stats.surveyCount}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-teal-500"></div>
+                  <span class="text-xs text-slate-400">부서 ${totalItems - stats.discussionCount - stats.surveyCount}</span>
                 </div>
               </div>
-            </button>
-            <button onclick="setTab('settings')" class="glass-card rounded-xl p-6 text-left hover:border-amber-500/30 transition-all group">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center text-violet-400 group-hover:scale-110 transition-transform">
-                  ${icons.settings}
-                </div>
-                <div>
-                  <p class="font-semibold text-white">설정</p>
-                  <p class="text-sm text-slate-400">데이터 관리</p>
-                </div>
+            </div>
+
+            <!-- 빠른 액션 -->
+            <div class="glass-card rounded-2xl p-6 animate-fade-up stagger-5 flex flex-col justify-center">
+              <h3 class="text-lg font-bold mb-4 text-center">빠른 액션</h3>
+              <div class="space-y-3">
+                <button onclick="setTab('list')" class="w-full glass rounded-xl p-4 text-left hover:bg-white/5 transition-all group flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                    ${icons.folder}
+                  </div>
+                  <div>
+                    <p class="font-medium text-white">전체 안건</p>
+                    <p class="text-xs text-slate-400">목록 보기</p>
+                  </div>
+                </button>
+                <button onclick="setTab('stats')" class="w-full glass rounded-xl p-4 text-left hover:bg-white/5 transition-all group flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                    ${icons.chart}
+                  </div>
+                  <div>
+                    <p class="font-medium text-white">상세 통계</p>
+                    <p class="text-xs text-slate-400">분석 보기</p>
+                  </div>
+                </button>
               </div>
-            </button>
+            </div>
           </div>
         </div>
       `;
@@ -1150,6 +1167,195 @@
       `;
 
       bindEvents();
+      
+      // 차트 렌더링
+      if (state.activeTab === 'overview' && state.isDataLoaded) {
+        renderCharts();
+      }
+    }
+
+    // 차트 렌더링 함수
+    function renderCharts() {
+      const stats = getStats();
+      const totalItems = state.agendaData.length;
+      
+      // 부서별 통계
+      const deptEntries = Object.entries(stats.deptStats).sort((a, b) => b[1] - a[1]);
+      
+      // 부서별 색상 팔레트
+      const deptColors = [
+        'rgba(251, 191, 36, 0.9)',   // amber
+        'rgba(59, 130, 246, 0.9)',   // blue
+        'rgba(139, 92, 246, 0.9)',   // violet
+        'rgba(236, 72, 153, 0.9)',   // pink
+        'rgba(34, 197, 94, 0.9)',    // green
+        'rgba(14, 165, 233, 0.9)',   // sky
+        'rgba(249, 115, 22, 0.9)',   // orange
+        'rgba(168, 85, 247, 0.9)',   // purple
+        'rgba(20, 184, 166, 0.9)',   // teal
+        'rgba(244, 63, 94, 0.9)',    // rose
+        'rgba(132, 204, 22, 0.9)',   // lime
+        'rgba(99, 102, 241, 0.9)',   // indigo
+        'rgba(100, 116, 139, 0.9)', // slate
+      ];
+
+      // 부서별 파이차트
+      const deptChartEl = document.getElementById('deptPieChart');
+      if (deptChartEl) {
+        new Chart(deptChartEl, {
+          type: 'doughnut',
+          data: {
+            labels: deptEntries.map(([dept]) => dept.split('\n')[0]),
+            datasets: [{
+              data: deptEntries.map(([_, count]) => count),
+              backgroundColor: deptColors.slice(0, deptEntries.length),
+              borderColor: 'rgba(10, 10, 15, 0.8)',
+              borderWidth: 2,
+              hoverBorderColor: '#fff',
+              hoverBorderWidth: 3,
+              hoverOffset: 10
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '55%',
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  font: { family: "'Noto Sans KR', sans-serif", size: 11 },
+                  padding: 12,
+                  usePointStyle: true,
+                  pointStyle: 'circle'
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#fbbf24',
+                bodyColor: '#fff',
+                borderColor: 'rgba(251, 191, 36, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                titleFont: { family: "'Noto Sans KR', sans-serif", weight: '600' },
+                bodyFont: { family: "'Noto Sans KR', sans-serif" },
+                callbacks: {
+                  label: function(context) {
+                    const value = context.raw;
+                    const percentage = Math.round((value / totalItems) * 100);
+                    return ` ${value}건 (${percentage}%)`;
+                  }
+                }
+              }
+            },
+            animation: {
+              animateRotate: true,
+              animateScale: true,
+              duration: 1000,
+              easing: 'easeOutQuart'
+            },
+            onClick: (event, elements) => {
+              if (elements.length > 0) {
+                const index = elements[0].index;
+                const dept = deptEntries[index][0];
+                filterAndShowList(dept);
+              }
+            }
+          }
+        });
+      }
+
+      // 답변 현황 파이차트
+      const answerChartEl = document.getElementById('answerPieChart');
+      if (answerChartEl) {
+        new Chart(answerChartEl, {
+          type: 'doughnut',
+          data: {
+            labels: ['답변 완료', '대기 중'],
+            datasets: [{
+              data: [stats.answeredCount, totalItems - stats.answeredCount],
+              backgroundColor: ['rgba(34, 197, 94, 0.9)', 'rgba(251, 191, 36, 0.9)'],
+              borderColor: 'rgba(10, 10, 15, 0.8)',
+              borderWidth: 2,
+              hoverOffset: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#fbbf24',
+                bodyColor: '#fff',
+                borderColor: 'rgba(251, 191, 36, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8
+              }
+            },
+            animation: {
+              animateRotate: true,
+              animateScale: true,
+              duration: 1200,
+              easing: 'easeOutQuart'
+            }
+          }
+        });
+      }
+
+      // 희망 답변 방식 파이차트
+      const responseChartEl = document.getElementById('responsePieChart');
+      if (responseChartEl) {
+        const deptOnlyCount = state.agendaData.filter(item => 
+          item.희망_부서답변 && !item.희망_전체토론 && !item.희망_전체설문
+        ).length;
+        
+        new Chart(responseChartEl, {
+          type: 'doughnut',
+          data: {
+            labels: ['전체 토론', '전체 설문', '부서 답변'],
+            datasets: [{
+              data: [stats.discussionCount, stats.surveyCount, deptOnlyCount],
+              backgroundColor: [
+                'rgba(59, 130, 246, 0.9)',
+                'rgba(168, 85, 247, 0.9)',
+                'rgba(20, 184, 166, 0.9)'
+              ],
+              borderColor: 'rgba(10, 10, 15, 0.8)',
+              borderWidth: 2,
+              hoverOffset: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#fbbf24',
+                bodyColor: '#fff',
+                borderColor: 'rgba(251, 191, 36, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8
+              }
+            },
+            animation: {
+              animateRotate: true,
+              animateScale: true,
+              duration: 1400,
+              easing: 'easeOutQuart'
+            }
+          }
+        });
+      }
     }
 
     // 이벤트 핸들러
