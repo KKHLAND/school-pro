@@ -1329,15 +1329,18 @@
           <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <div class="flex items-center gap-3 mb-3">
+                <div class="flex items-center gap-4 mb-3">
                   <div class="w-12 h-12 rounded-2xl gold-gradient flex items-center justify-center gold-glow">
                     ${icons.sparkles}
                   </div>
-                  <span class="text-amber-400/80 text-sm font-medium tracking-widest uppercase">
-                    ${state.schoolInfo.schoolName || '학교명 미설정'}
-                  </span>
+                  <div>
+                    <h2 class="text-xl md:text-2xl font-bold gold-text tracking-wide">
+                      ${state.schoolInfo.schoolName || '학교명 미설정'}
+                    </h2>
+                    <p class="text-amber-400/60 text-xs font-medium tracking-widest uppercase mt-1">Education Dashboard</p>
+                  </div>
                 </div>
-                <h1 class="text-2xl md:text-4xl font-bold">
+                <h1 class="text-xl md:text-3xl font-bold">
                   <span class="gold-text font-display">${state.schoolInfo.year}</span>
                   <span class="text-white ml-2">교육사업평가분석토론회</span>
                 </h1>
